@@ -227,12 +227,19 @@ async function handleRequest(request, env) {
         }
     }
 
-    // Serve static files from env.ASSETS
-    return env.ASSETS.fetch(request);
+    // For non-API routes, return null to let the asset handler take over
+    return null;
 }
 
 export default {
     async fetch(request, env, ctx) {
-        return handleRequest(request, env);
+        const response = await handleRequest(request, env);
+        // If we got a response from the API handler, return it
+        if (response) {
+            return response;
+        }
+        // Otherwise, this request should be handled by Cloudflare's asset serving
+        // Since we're using `assets` in wrangler.toml, Cloudflare handles this automatically
+        return new Response('Not Found', { status: 404 });
     }
 };

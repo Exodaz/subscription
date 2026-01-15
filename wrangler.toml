@@ -1,11 +1,9 @@
 name = "subscription-manager"
 main = "src/worker.js"
 compatibility_date = "2024-01-01"
+assets = { directory = "./public" }
 
 [[d1_databases]]
 binding = "DB"
 database_name = "subscription-db"
 database_id = "7cdf8496-4f84-44e6-8624-e70d352e407a"
-
-[site]
-bucket = "./public"
