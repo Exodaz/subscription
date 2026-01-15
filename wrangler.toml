@@ -1,0 +1,11 @@
+name = "subscription-manager"
+main = "src/worker.js"
+compatibility_date = "2024-01-01"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "subscription-db"
+database_id = "placeholder"
+
+[site]
+bucket = "./public"

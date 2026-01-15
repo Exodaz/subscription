@@ -1,0 +1,16 @@
+{
+    "name": "subscription-manager",
+    "version": "1.0.0",
+    "description": "ระบบจัดการ Subscription สำหรับ Family Owner",
+    "main": "src/worker.js",
+    "scripts": {
+        "dev": "wrangler dev",
+        "deploy": "wrangler deploy",
+        "db:create": "wrangler d1 create subscription-db",
+        "db:migrate": "wrangler d1 execute subscription-db --file=./schema.sql",
+        "db:migrate:local": "wrangler d1 execute subscription-db --local --file=./schema.sql"
+    },
+    "devDependencies": {
+        "wrangler": "^3.0.0"
+    }
+}

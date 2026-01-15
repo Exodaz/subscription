@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="th">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Subscription Manager - ระบบจัดการ Subscription</title>
+    <meta name="description" content="ระบบจัดการ Subscription สำหรับ Family Owner - จัดการบ้าน สมาชิก และการชำระเงิน">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600;700&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+</head>
+
+<body>
+    <div class="app-container">
+        <!-- Sidebar Navigation -->
+        <aside class="sidebar" id="sidebar">
+            <div class="sidebar-header">
+                <div class="logo">
+                    <span class="logo-icon">👨‍👩‍👧‍👦</span>
+                    <span class="logo-text">Family Sub</span>
+                </div>
+            </div>
+            <nav class="sidebar-nav">
+                <a href="#" class="nav-item active" data-page="dashboard">
+                    <span class="nav-icon">📊</span>
+                    <span class="nav-text">Dashboard</span>
+                </a>
+                <a href="#" class="nav-item" data-page="houses">
+                    <span class="nav-icon">🏠</span>
+                    <span class="nav-text">บ้านทั้งหมด</span>
+                </a>
+                <a href="#" class="nav-item" data-page="members">
+                    <span class="nav-icon">👥</span>
+                    <span class="nav-text">สมาชิก</span>
+                </a>
+                <a href="#" class="nav-item" data-page="payments">
+                    <span class="nav-icon">💳</span>
+                    <span class="nav-text">การชำระเงิน</span>
+                </a>
+            </nav>
+            <div class="sidebar-footer">
+                <button class="btn-add-sample" id="addSampleData">
+                    <span>➕</span> เพิ่มข้อมูลตัวอย่าง
+                </button>
+            </div>
+        </aside>
+
+        <!-- Mobile Menu Toggle -->
+        <button class="mobile-menu-toggle" id="mobileMenuToggle">
+            <span></span>
+            <span></span>
+            <span></span>
+        </button>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Dashboard Page -->
+            <section class="page active" id="page-dashboard">
+                <header class="page-header">
+                    <h1>📊 Dashboard</h1>
+                    <p class="page-subtitle">ภาพรวมระบบจัดการ Subscription ของคุณ</p>
+                </header>
+
+                <!-- Stats Cards -->
+                <div class="stats-grid">
+                    <div class="stat-card stat-primary">
+                        <div class="stat-icon">🏠</div>
+                        <div class="stat-content">
+                            <span class="stat-value" id="totalHouses">0</span>
+                            <span class="stat-label">บ้านทั้งหมด</span>
+                        </div>
+                    </div>
+                    <div class="stat-card stat-success">
+                        <div class="stat-icon">👥</div>
+                        <div class="stat-content">
+                            <span class="stat-value" id="totalMembers">0</span>
+                            <span class="stat-label">สมาชิกทั้งหมด</span>
+                        </div>
+                    </div>
+                    <div class="stat-card stat-info">
+                        <div class="stat-icon">💰</div>
+                        <div class="stat-content">
+                            <span class="stat-value" id="totalMonthlyFee">฿0</span>
+                            <span class="stat-label">ยอดรวม/เดือน</span>
+                        </div>
+                    </div>
+                    <div class="stat-card stat-warning">
+                        <div class="stat-icon">⚠️</div>
+                        <div class="stat-content">
+                            <span class="stat-value" id="expiringMembers">0</span>
+                            <span class="stat-label">ใกล้หมดอายุ (7 วัน)</span>
+                        </div>
+                    </div>
+                    <div class="stat-card stat-danger">
+                        <div class="stat-icon">🚫</div>
+                        <div class="stat-content">
+                            <span class="stat-value" id="expiredMembers">0</span>
+                            <span class="stat-label">หมดอายุแล้ว</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Alerts Section -->
+                <div class="alerts-section">
+                    <h2 class="section-title">🔔 การแจ้งเตือน</h2>
+                    <div class="alerts-container" id="alertsContainer">
+                        <!-- Alerts will be rendered here -->
+                    </div>
+                </div>
+
+                <!-- Upcoming Payments -->
+                <div class="upcoming-section">
+                    <h2 class="section-title">📅 การชำระเงินที่กำลังจะมาถึง</h2>
+                    <div class="upcoming-list" id="upcomingPayments">
+                        <!-- Upcoming payments will be rendered here -->
+                    </div>
+                </div>
+            </section>
+
+            <!-- Houses Page -->
+            <section class="page" id="page-houses">
+                <header class="page-header">
+                    <div class="header-left">
+                        <h1>🏠 จัดการบ้าน</h1>
+                        <p class="page-subtitle">เพิ่ม แก้ไข และจัดการบ้านทั้งหมด</p>
+                    </div>
+                    <button class="btn btn-primary" id="addHouseBtn">
+                        <span>➕</span> เพิ่มบ้านใหม่
+                    </button>
+                </header>
+
+                <div class="search-filter">
+                    <input type="text" class="search-input" id="houseSearch" placeholder="🔍 ค้นหาบ้าน...">
+                </div>
+
+                <div class="houses-grid" id="housesGrid">
+                    <!-- Houses will be rendered here -->
+                </div>
+            </section>
+
+            <!-- Members Page -->
+            <section class="page" id="page-members">
+                <header class="page-header">
+                    <div class="header-left">
+                        <h1>👥 จัดการสมาชิก</h1>
+                        <p class="page-subtitle">ดูและจัดการสมาชิกทั้งหมด</p>
+                    </div>
+                    <button class="btn btn-primary" id="addMemberBtn">
+                        <span>➕</span> เพิ่มสมาชิกใหม่
+                    </button>
+                </header>
+
+                <div class="search-filter">
+                    <input type="text" class="search-input" id="memberSearch" placeholder="🔍 ค้นหาสมาชิก...">
+                    <select class="filter-select" id="houseFilter">
+                        <option value="">ทุกบ้าน</option>
+                    </select>
+                    <select class="filter-select" id="statusFilter">
+                        <option value="">ทุกสถานะ</option>
+                        <option value="active">Active</option>
+                        <option value="expiring">ใกล้หมดอายุ</option>
+                        <option value="expired">หมดอายุ</option>
+                    </select>
+                </div>
+
+                <div class="table-container">
+                    <table class="data-table" id="membersTable">
+                        <thead>
+                            <tr>
+                                <th>สมาชิก</th>
+                                <th>บ้าน</th>
+                                <th>ยอดชำระ</th>
+                                <th>วันชำระเงิน</th>
+                                <th>วันหมดอายุ</th>
+                                <th>สถานะ</th>
+                                <th>จัดการ</th>
+                            </tr>
+                        </thead>
+                        <tbody id="membersTableBody">
+                            <!-- Members will be rendered here -->
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- Payments Page -->
+            <section class="page" id="page-payments">
+                <header class="page-header">
+                    <div class="header-left">
+                        <h1>💳 การชำระเงิน</h1>
+                        <p class="page-subtitle">ติดตามและบันทึกการชำระเงิน</p>
+                    </div>
+                </header>
+
+                <div class="payment-tabs">
+                    <button class="tab-btn active" data-tab="pending">รอชำระ</button>
+                    <button class="tab-btn" data-tab="history">ประวัติการชำระ</button>
+                </div>
+
+                <div class="tab-content active" id="tab-pending">
+                    <div class="payment-list" id="pendingPayments">
+                        <!-- Pending payments will be rendered here -->
+                    </div>
+                </div>
+
+                <div class="tab-content" id="tab-history">
+                    <div class="payment-history" id="paymentHistory">
+                        <!-- Payment history will be rendered here -->
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- Modal: Add/Edit House -->
+    <div class="modal" id="houseModal">
+        <div class="modal-backdrop"></div>
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="houseModalTitle">เพิ่มบ้านใหม่</h2>
+                <button class="modal-close" id="closeHouseModal">&times;</button>
+            </div>
+            <form id="houseForm">
+                <input type="hidden" id="houseId">
+                <div class="form-group">
+                    <label for="houseName">ชื่อบ้าน *</label>
+                    <input type="text" id="houseName" required placeholder="เช่น บ้านที่ 1">
+                </div>
+                <div class="form-group">
+                    <label for="houseDescription">รายละเอียด</label>
+                    <textarea id="houseDescription" placeholder="รายละเอียดเพิ่มเติม (ถ้ามี)"></textarea>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" id="cancelHouseBtn">ยกเลิก</button>
+                    <button type="submit" class="btn btn-primary">บันทึก</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal: Add/Edit Member -->
+    <div class="modal" id="memberModal">
+        <div class="modal-backdrop"></div>
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="memberModalTitle">เพิ่มสมาชิกใหม่</h2>
+                <button class="modal-close" id="closeMemberModal">&times;</button>
+            </div>
+            <form id="memberForm">
+                <input type="hidden" id="memberId">
+                <div class="form-group">
+                    <label for="memberHouse">บ้าน *</label>
+                    <select id="memberHouse" required>
+                        <option value="">เลือกบ้าน</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="memberName">ชื่อสมาชิก *</label>
+                    <input type="text" id="memberName" required placeholder="ชื่อ-นามสกุล">
+                </div>
+                <div class="form-group">
+                    <label for="memberEmail">อีเมล</label>
+                    <input type="email" id="memberEmail" placeholder="email@example.com">
+                </div>
+                <div class="form-group">
+                    <label for="memberPhone">เบอร์โทร</label>
+                    <input type="tel" id="memberPhone" placeholder="0812345678">
+                </div>
+                <div class="form-group">
+                    <label for="monthlyFee">ยอดชำระ/เดือน (บาท) *</label>
+                    <input type="number" id="monthlyFee" required placeholder="299" min="0" step="0.01">
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="paymentDate">วันชำระเงิน *</label>
+                        <input type="date" id="paymentDate" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="expirationDate">วันหมดอายุ *</label>
+                        <input type="date" id="expirationDate" required>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" id="cancelMemberBtn">ยกเลิก</button>
+                    <button type="submit" class="btn btn-primary">บันทึก</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal: Confirm Delete -->
+    <div class="modal" id="confirmModal">
+        <div class="modal-backdrop"></div>
+        <div class="modal-content modal-small">
+            <div class="modal-header">
+                <h2>ยืนยันการลบ</h2>
+                <button class="modal-close" id="closeConfirmModal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p id="confirmMessage">คุณแน่ใจหรือไม่ที่จะลบรายการนี้?</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" id="cancelConfirmBtn">ยกเลิก</button>
+                <button type="button" class="btn btn-danger" id="confirmDeleteBtn">ลบ</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Record Payment -->
+    <div class="modal" id="paymentModal">
+        <div class="modal-backdrop"></div>
+        <div class="modal-content modal-small">
+            <div class="modal-header">
+                <h2>บันทึกการชำระเงิน</h2>
+                <button class="modal-close" id="closePaymentModal">&times;</button>
+            </div>
+            <form id="paymentForm">
+                <input type="hidden" id="paymentMemberId">
+                <div class="form-group">
+                    <label for="paymentAmount">จำนวนเงิน (บาท) *</label>
+                    <input type="number" id="paymentAmount" required placeholder="299" min="0" step="0.01">
+                </div>
+                <div class="form-group">
+                    <label for="newExpirationDate">วันหมดอายุใหม่ *</label>
+                    <input type="date" id="newExpirationDate" required>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" id="cancelPaymentBtn">ยกเลิก</button>
+                    <button type="submit" class="btn btn-success">บันทึกการชำระ</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal: Member Details -->
+    <div class="modal" id="memberDetailsModal">
+        <div class="modal-backdrop"></div>
+        <div class="modal-content modal-large">
+            <div class="modal-header">
+                <h2 id="memberDetailsTitle">รายละเอียดสมาชิก</h2>
+                <button class="modal-close" id="closeMemberDetailsModal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="member-details-list" id="memberDetailsList">
+                    <!-- Member details will be rendered here -->
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" id="closeMemberDetailsBtn">ปิด</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notification -->
+    <div class="toast-container" id="toastContainer"></div>
+
+    <script src="app.js"></script>
+</body>
+
+</html>
