@@ -1040,3 +1040,343 @@ const UI = {
 
 // Initialize
 document.addEventListener('DOMContentLoaded', () => UI.init());
+
+// ===== REPORTS & ANALYTICS =====
+const Reports = {
+    charts: {},
+
+    async renderReports() {
+        const stats = Store.stats || {};
+        const members = Store.members;
+        const houses = Store.houses;
+        const products = Store.products;
+
+        // Update summary cards
+        document.getElementById('reportYearlyRevenue').textContent = `฿${(stats.totalPaidYearly || 0).toLocaleString()}`;
+        document.getElementById('reportMonthlyAvg').textContent = `฿${(stats.avgMonthlyPaid || 0).toLocaleString()}`;
+        document.getElementById('reportTotalMembers').textContent = stats.totalMembers || 0;
+        document.getElementById('reportTotalHouses').textContent = stats.totalHouses || 0;
+
+        // Render charts
+        this.renderRevenueChart();
+        this.renderProductsChart();
+        this.renderStatusChart();
+        this.renderHousesChart();
+
+        // Render detailed reports
+        this.renderProductReport();
+        this.renderHouseReport();
+    },
+
+    renderRevenueChart() {
+        const ctx = document.getElementById('revenueChart');
+        if (!ctx) return;
+
+        // Destroy existing chart
+        if (this.charts.revenue) this.charts.revenue.destroy();
+
+        // Get last 6 months data (mock for now)
+        const months = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.'];
+        const data = Store.members.map((m, i) => (m.monthly_fee || 0) * (i % 6 + 1) / 10);
+
+        this.charts.revenue = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: months,
+                datasets: [{
+                    label: 'รายได้ (บาท)',
+                    data: data.slice(0, 6),
+                    borderColor: '#6366f1',
+                    backgroundColor: 'rgba(99, 102, 241, 0.1)',
+                    tension: 0.4,
+                    fill: true
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                plugins: {
+                    legend: { display: false }
+                }
+            }
+        });
+    },
+
+    renderProductsChart() {
+        const ctx = document.getElementById('productsChart');
+        if (!ctx) return;
+
+        if (this.charts.products) this.charts.products.destroy();
+
+        const productCounts = {};
+        Store.houses.forEach(h => {
+            if (h.product_id) {
+                const product = ProductService.getById(h.product_id);
+                if (product) {
+                    productCounts[product.name] = (productCounts[product.name] || 0) + 1;
+                }
+            }
+        });
+
+        this.charts.products = new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: Object.keys(productCounts),
+                datasets: [{
+                    data: Object.values(productCounts),
+                    backgroundColor: ['#6366f1', '#8b5cf6', '#ec4899', '#f59e0b', '#10b981', '#3b82f6']
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: true
+            }
+        });
+    },
+
+    renderStatusChart() {
+        const ctx = document.getElementById('statusChart');
+        if (!ctx) return;
+
+        if (this.charts.status) this.charts.status.destroy();
+
+        let active = 0, expiring = 0, expired = 0;
+        Store.members.forEach(m => {
+            const status = MemberService.getStatus(m);
+            if (status === 'active') active++;
+            else if (status === 'expiring') expiring++;
+            else expired++;
+        });
+
+        this.charts.status = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: ['Active', 'ใกล้หมดอายุ', 'หมดอายุ'],
+                datasets: [{
+                    label: 'จำนวนสมาชิก',
+                    data: [active, expiring, expired],
+                    backgroundColor: ['#10b981', '#f59e0b', '#ef4444']
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                plugins: {
+                    legend: { display: false }
+                }
+            }
+        });
+    },
+
+    renderHousesChart() {
+        const ctx = document.getElementById('housesChart');
+        if (!ctx) return;
+
+        if (this.charts.houses) this.charts.houses.destroy();
+
+        const houseCounts = Store.houses.map(h => ({
+            name: h.name,
+            count: Store.members.filter(m => m.house_id === h.id).length
+        }));
+
+        this.charts.houses = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: houseCounts.map(h => h.name),
+                datasets: [{
+                    label: 'จำนวนสมาชิก',
+                    data: houseCounts.map(h => h.count),
+                    backgroundColor: '#6366f1'
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                plugins: {
+                    legend: { display: false }
+                }
+            }
+        });
+    },
+
+    renderProductReport() {
+        const tbody = document.getElementById('productReportTable');
+        if (!tbody) return;
+
+        const productStats = {};
+        Store.houses.forEach(h => {
+            if (h.product_id) {
+                const product = ProductService.getById(h.product_id);
+                if (product) {
+                    if (!productStats[product.id]) {
+                        productStats[product.id] = {
+                            name: product.name,
+                            icon: product.icon,
+                            houses: 0,
+                            members: 0,
+                            revenue: 0
+                        };
+                    }
+                    productStats[product.id].houses++;
+                    const members = Store.members.filter(m => m.house_id === h.id);
+                    productStats[product.id].members += members.length;
+                    productStats[product.id].revenue += members.reduce((sum, m) => sum + (m.monthly_fee || 0), 0);
+                }
+            }
+        });
+
+        tbody.innerHTML = Object.values(productStats).map(p => `
+            <tr>
+                <td>${p.icon} ${p.name}</td>
+                <td>${p.houses}</td>
+                <td>${p.members}</td>
+                <td>฿${p.revenue.toLocaleString()}</td>
+            </tr>
+        `).join('');
+    },
+
+    renderHouseReport() {
+        const tbody = document.getElementById('houseReportTable');
+        if (!tbody) return;
+
+        tbody.innerHTML = Store.houses.map(h => {
+            const product = ProductService.getById(h.product_id);
+            const members = Store.members.filter(m => m.house_id === h.id);
+            const revenue = members.reduce((sum, m) => sum + (m.monthly_fee || 0), 0);
+            const stats = HouseService.getMemberStats(h.id);
+
+            return `
+                <tr>
+                    <td>${h.name}</td>
+                    <td>${product ? `${product.icon} ${product.name}` : '-'}</td>
+                    <td>${members.length}</td>
+                    <td>฿${revenue.toLocaleString()}</td>
+                    <td>
+                        <span class="status-badge status-${stats.expired > 0 ? 'expired' : stats.expiring > 0 ? 'expiring' : 'active'}">
+                            ${stats.active} Active / ${stats.expiring} ใกล้หมด / ${stats.expired} หมดอายุ
+                        </span>
+                    </td>
+                </tr>
+            `;
+        }).join('');
+    }
+};
+
+// ===== SORTING FUNCTIONALITY =====
+const Sorting = {
+    currentSort: { column: null, direction: 'asc' },
+
+    init() {
+        document.querySelectorAll('.sortable').forEach(header => {
+            header.addEventListener('click', () => {
+                const column = header.dataset.sort;
+                this.sort(column);
+            });
+        });
+    },
+
+    sort(column) {
+        // Toggle direction
+        if (this.currentSort.column === column) {
+            this.currentSort.direction = this.currentSort.direction === 'asc' ? 'desc' : 'asc';
+        } else {
+            this.currentSort.column = column;
+            this.currentSort.direction = 'asc';
+        }
+
+        // Update UI
+        document.querySelectorAll('.sortable').forEach(h => {
+            h.classList.remove('sort-asc', 'sort-desc');
+            if (h.dataset.sort === column) {
+                h.classList.add(`sort-${this.currentSort.direction}`);
+            }
+        });
+
+        // Sort members
+        Store.members.sort((a, b) => {
+            let aVal, bVal;
+
+            switch (column) {
+                case 'name':
+                    aVal = a.name.toLowerCase();
+                    bVal = b.name.toLowerCase();
+                    break;
+                case 'fee':
+                    aVal = a.monthly_fee || 0;
+                    bVal = b.monthly_fee || 0;
+                    break;
+                case 'expiration':
+                    aVal = new Date(a.expiration_date);
+                    bVal = new Date(b.expiration_date);
+                    break;
+                default:
+                    return 0;
+            }
+
+            if (aVal < bVal) return this.currentSort.direction === 'asc' ? -1 : 1;
+            if (aVal > bVal) return this.currentSort.direction === 'asc' ? 1 : -1;
+            return 0;
+        });
+
+        UI.renderMembers();
+    }
+};
+
+// ===== PWA REGISTRATION =====
+if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/sw.js')
+            .then(reg => console.log('✅ Service Worker registered'))
+            .catch(err => console.log('❌ Service Worker registration failed:', err));
+    });
+}
+
+// Update UI.init to include new features
+const originalInit = UI.init;
+UI.init = async function() {
+    await originalInit.call(this);
+    Sorting.init();
+    
+    // Bind report tabs
+    document.querySelectorAll('.report-tab-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const report = btn.dataset.report;
+            document.querySelectorAll('.report-tab-btn').forEach(b => b.classList.remove('active'));
+            document.querySelectorAll('.report-content').forEach(c => c.classList.remove('active'));
+            btn.classList.add('active');
+            document.getElementById(`report-${report}`).classList.add('active');
+        });
+    });
+
+    // Bind clear filters
+    const clearBtn = document.getElementById('clearFiltersBtn');
+    if (clearBtn) {
+        clearBtn.addEventListener('click', () => {
+            document.getElementById('memberSearch').value = '';
+            document.getElementById('houseFilter').value = '';
+            document.getElementById('statusFilter').value = '';
+            clearBtn.style.display = 'none';
+            UI.renderMembers();
+        });
+
+        // Show clear button when filters are active
+        [document.getElementById('memberSearch'), document.getElementById('houseFilter'), document.getElementById('statusFilter')].forEach(el => {
+            el.addEventListener('change', () => {
+                const hasFilters = document.getElementById('memberSearch').value || 
+                                 document.getElementById('houseFilter').value || 
+                                 document.getElementById('statusFilter').value;
+                clearBtn.style.display = hasFilters ? 'inline-block' : 'none';
+            });
+        });
+    }
+};
+
+// Update renderPage to include reports
+const originalRenderPage = UI.renderPage;
+UI.renderPage = function(page) {
+    originalRenderPage.call(this, page);
+    if (page === 'reports') {
+        Reports.renderReports();
+    }
+};
+

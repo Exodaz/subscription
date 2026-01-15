@@ -6,12 +6,17 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Subscription Manager - ระบบจัดการ Subscription</title>
     <meta name="description" content="ระบบจัดการ Subscription สำหรับ Family Owner - จัดการบ้าน สมาชิก และการชำระเงิน">
+    <meta name="theme-color" content="#6366f1">
+    <link rel="manifest" href="/manifest.json">
+    <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png">
+    <link rel="apple-touch-icon" href="/icon-192.png">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link
         href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600;700&display=swap"
         rel="stylesheet">
     <link rel="stylesheet" href="styles.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 </head>
 
 <body>
@@ -44,6 +49,14 @@
                 <a href="#" class="nav-item" data-page="payments">
                     <span class="nav-icon">💳</span>
                     <span class="nav-text">การชำระเงิน</span>
+                </a>
+                <a href="#" class="nav-item" data-page="reports">
+                    <span class="nav-icon">📈</span>
+                    <span class="nav-text">รายงาน</span>
+                </a>
+                <a href="#" class="nav-item" data-page="portal">
+                    <span class="nav-icon">🔐</span>
+                    <span class="nav-text">Member Portal</span>
                 </a>
             </nav>
             <div class="sidebar-footer">
@@ -181,18 +194,21 @@
                         <option value="expiring">ใกล้หมดอายุ</option>
                         <option value="expired">หมดอายุ</option>
                     </select>
+                    <button class="btn btn-secondary" id="clearFiltersBtn" style="display: none;">🗑️ Clear
+                        Filters</button>
                 </div>
 
                 <div class="table-container">
                     <table class="data-table" id="membersTable">
                         <thead>
                             <tr>
-                                <th>สมาชิก</th>
+                                <th class="sortable" data-sort="name">สมาชิก <span class="sort-icon">↕️</span></th>
                                 <th>Product</th>
                                 <th>บ้าน</th>
-                                <th>ยอดชำระ</th>
+                                <th class="sortable" data-sort="fee">ยอดชำระ <span class="sort-icon">↕️</span></th>
                                 <th>รอบบิล</th>
-                                <th>วันหมดอายุ</th>
+                                <th class="sortable" data-sort="expiration">วันหมดอายุ <span class="sort-icon">↕️</span>
+                                </th>
                                 <th>สถานะ</th>
                                 <th>จัดการ</th>
                             </tr>
