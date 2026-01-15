@@ -88,15 +88,22 @@
                     <div class="stat-card stat-info">
                         <div class="stat-icon">💰</div>
                         <div class="stat-content">
-                            <span class="stat-value" id="totalMonthlyFee">฿0</span>
-                            <span class="stat-label">ยอดรวม/เดือน</span>
+                            <span class="stat-value" id="avgMonthlyPaid">฿0</span>
+                            <span class="stat-label">เฉลี่ยต่อเดือน (ชำระแล้ว)</span>
+                        </div>
+                    </div>
+                    <div class="stat-card stat-success">
+                        <div class="stat-icon">🌟</div>
+                        <div class="stat-content">
+                            <span class="stat-value" id="totalPaidYearly">฿0</span>
+                            <span class="stat-label">ยอดรวมต่อปี</span>
                         </div>
                     </div>
                     <div class="stat-card stat-warning">
                         <div class="stat-icon">⚠️</div>
                         <div class="stat-content">
                             <span class="stat-value" id="expiringMembers">0</span>
-                            <span class="stat-label">ใกล้หมดอายุ (7 วัน)</span>
+                            <span class="stat-label">ใกล้หมดอายุ</span>
                         </div>
                     </div>
                     <div class="stat-card stat-danger">
@@ -106,23 +113,22 @@
                             <span class="stat-label">หมดอายุแล้ว</span>
                         </div>
                     </div>
-                </div>
 
-                <!-- Alerts Section -->
-                <div class="alerts-section">
-                    <h2 class="section-title">🔔 การแจ้งเตือน</h2>
-                    <div class="alerts-container" id="alertsContainer">
-                        <!-- Alerts will be rendered here -->
+                    <!-- Alerts Section -->
+                    <div class="alerts-section">
+                        <h2 class="section-title">🔔 การแจ้งเตือน</h2>
+                        <div class="alerts-container" id="alertsContainer">
+                            <!-- Alerts will be rendered here -->
+                        </div>
                     </div>
-                </div>
 
-                <!-- Upcoming Payments -->
-                <div class="upcoming-section">
-                    <h2 class="section-title">📅 การชำระเงินที่กำลังจะมาถึง</h2>
-                    <div class="upcoming-list" id="upcomingPayments">
-                        <!-- Upcoming payments will be rendered here -->
+                    <!-- Upcoming Payments -->
+                    <div class="upcoming-section">
+                        <h2 class="section-title">📅 การชำระเงินที่กำลังจะมาถึง</h2>
+                        <div class="upcoming-list" id="upcomingPayments">
+                            <!-- Upcoming payments will be rendered here -->
+                        </div>
                     </div>
-                </div>
             </section>
 
             <!-- Houses Page -->
@@ -153,6 +159,12 @@
                         <h1>👥 จัดการสมาชิก</h1>
                         <p class="page-subtitle">ดูและจัดการสมาชิกทั้งหมด</p>
                     </div>
+                    <button class="btn btn-secondary" id="importMembersBtn">
+                        <span>📥</span> Import CSV
+                    </button>
+                    <button class="btn btn-secondary" id="exportMembersBtn">
+                        <span>📤</span> Export CSV
+                    </button>
                     <button class="btn btn-primary" id="addMemberBtn">
                         <span>➕</span> เพิ่มสมาชิกใหม่
                     </button>
@@ -253,6 +265,12 @@
                     <input type="text" id="houseName" required placeholder="เช่น บ้านที่ 1">
                 </div>
                 <div class="form-group">
+                    <label for="houseProduct">Product *</label>
+                    <select id="houseProduct" required>
+                        <option value="">เลือก Product</option>
+                    </select>
+                </div>
+                <div class="form-group">
                     <label for="houseDescription">รายละเอียด</label>
                     <textarea id="houseDescription" placeholder="รายละเอียดเพิ่มเติม (ถ้ามี)"></textarea>
                 </div>
@@ -278,12 +296,6 @@
                     <label for="memberHouse">บ้าน *</label>
                     <select id="memberHouse" required>
                         <option value="">เลือกบ้าน</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label for="memberProduct">Product *</label>
-                    <select id="memberProduct" required>
-                        <option value="">เลือก Product</option>
                     </select>
                 </div>
                 <div class="form-group">
@@ -392,6 +404,35 @@
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" id="closeMemberDetailsBtn">ปิด</button>
             </div>
+        </div>
+    </div>
+
+    <!-- Modal: Import Members CSV -->
+    <div class="modal" id="importModal">
+        <div class="modal-backdrop"></div>
+        <div class="modal-content modal-small">
+            <div class="modal-header">
+                <h2>📥 Import สมาชิกจาก CSV</h2>
+                <button class="modal-close" id="closeImportModal">&times;</button>
+            </div>
+            <form id="importForm">
+                <div class="form-group">
+                    <label for="importHouse">บ้านที่จะ Import *</label>
+                    <select id="importHouse" required>
+                        <option value="">เลือกบ้าน</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="importCsvData">CSV Data *</label>
+                    <textarea id="importCsvData" required
+                        placeholder="ชื่อสมาชิก,อีเมล,เบอร์โทร,ยอดชำระ,รอบบิล,วันชำระ,วันหมดอายุ&#10;สมชาย ใจดี,somchai@email.com,0812345678,299,monthly,2024-01-01,2024-02-01"
+                        rows="6"></textarea>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" id="cancelImportBtn">ยกเลิก</button>
+                    <button type="submit" class="btn btn-primary">Import</button>
+                </div>
+            </form>
         </div>
     </div>
 

@@ -84,8 +84,8 @@ const ProductService = {
         Store.products = Store.products.filter(p => p.id !== id);
     },
 
-    getMemberCount(productId) {
-        return Store.members.filter(m => m.product_id === productId).length;
+    getHouseCount(productId) {
+        return Store.houses.filter(h => h.product_id === productId).length;
     }
 };
 
@@ -165,6 +165,14 @@ const MemberService = {
 
     async refreshStats() {
         Store.stats = await Api.get('/stats');
+    },
+
+    async exportCSV() {
+        window.location.href = `${API_BASE}/members/export`;
+    },
+
+    async importCSV(houseId, csvData) {
+        return await Api.post('/members/import', { houseId, csvData });
     },
 
     getStatus(member) {
@@ -258,11 +266,12 @@ const UI = {
 
     // Dashboard
     renderDashboard() {
-        const stats = Store.stats || { totalHouses: 0, totalMembers: 0, totalMonthlyFee: 0, expiringMembers: 0, expiredMembers: 0 };
+        const stats = Store.stats || { totalHouses: 0, totalMembers: 0, avgMonthlyPaid: 0, totalPaidYearly: 0, expiringMembers: 0, expiredMembers: 0 };
 
         document.getElementById('totalHouses').textContent = stats.totalHouses;
         document.getElementById('totalMembers').textContent = stats.totalMembers;
-        document.getElementById('totalMonthlyFee').textContent = `฿${(stats.totalMonthlyFee || 0).toLocaleString()}`;
+        document.getElementById('avgMonthlyPaid').textContent = `฿${(stats.avgMonthlyPaid || 0).toLocaleString('th-TH', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
+        document.getElementById('totalPaidYearly').textContent = `฿${(stats.totalPaidYearly || 0).toLocaleString('th-TH', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
         document.getElementById('expiringMembers').textContent = stats.expiringMembers;
         document.getElementById('expiredMembers').textContent = stats.expiredMembers;
 
@@ -373,10 +382,13 @@ const UI = {
 
         container.innerHTML = houses.map(h => {
             const stats = HouseService.getMemberStats(h.id);
+            const product = ProductService.getById(h.product_id);
             return `
                 <div class="house-card">
                     <div class="house-header">
-                        <h3 class="house-name">🏠 ${h.name}</h3>
+                        <h3 class="house-name">
+                            ${product ? `<span style="font-size: 1.5rem">${product.icon || '📦'}</span>` : '🏠'} ${h.name}
+                        </h3>
                         <div class="house-actions">
                             <button class="btn-icon btn-edit" onclick="UI.editHouse('${h.id}')" title="แก้ไข">✏️</button>
                             <button class="btn-icon btn-delete" onclick="UI.confirmDelete('house', '${h.id}')" title="ลบ">🗑️</button>
@@ -424,7 +436,7 @@ const UI = {
         }
 
         container.innerHTML = products.map(p => {
-            const memberCount = ProductService.getMemberCount(p.id);
+            const houseCount = ProductService.getHouseCount(p.id);
             return `
                 <div class="product-card" style="--product-color: ${p.color}">
                     <div class="product-header">
@@ -435,7 +447,7 @@ const UI = {
                         </div>
                     </div>
                     <div class="product-name">${p.name}</div>
-                    <div class="product-count">👥 ${memberCount} สมาชิก</div>
+                    <div class="product-count">🏠 ${houseCount} บ้าน</div>
                 </div>
             `;
         }).join('');
@@ -603,6 +615,15 @@ const UI = {
         document.getElementById('cancelProductBtn').addEventListener('click', () => this.closeModal('productModal'));
         document.querySelector('#productModal .modal-backdrop').addEventListener('click', () => this.closeModal('productModal'));
 
+        // Import modal
+        document.getElementById('importMembersBtn').addEventListener('click', () => this.openImportModal());
+        document.getElementById('closeImportModal').addEventListener('click', () => this.closeModal('importModal'));
+        document.getElementById('cancelImportBtn').addEventListener('click', () => this.closeModal('importModal'));
+        document.querySelector('#importModal .modal-backdrop').addEventListener('click', () => this.closeModal('importModal'));
+
+        // Export button
+        document.getElementById('exportMembersBtn').addEventListener('click', () => MemberService.exportCSV());
+
         // Confirm modal
         document.getElementById('closeConfirmModal').addEventListener('click', () => this.closeModal('confirmModal'));
         document.getElementById('cancelConfirmBtn').addEventListener('click', () => this.closeModal('confirmModal'));
@@ -642,9 +663,11 @@ const UI = {
     },
 
     openHouseModal(house = null) {
+        this.updateProductSelect();
         document.getElementById('houseModalTitle').textContent = house ? 'แก้ไขบ้าน' : 'เพิ่มบ้านใหม่';
         document.getElementById('houseId').value = house ? house.id : '';
         document.getElementById('houseName').value = house ? house.name : '';
+        document.getElementById('houseProduct').value = house ? (house.product_id || '') : '';
         document.getElementById('houseDescription').value = house ? (house.description || '') : '';
         this.openModal('houseModal');
     },
@@ -670,11 +693,9 @@ const UI = {
 
     openMemberModal(member = null) {
         this.updateHouseSelect();
-        this.updateProductSelect();
         document.getElementById('memberModalTitle').textContent = member ? 'แก้ไขสมาชิก' : 'เพิ่มสมาชิกใหม่';
         document.getElementById('memberId').value = member ? member.id : '';
         document.getElementById('memberHouse').value = member ? member.house_id : '';
-        document.getElementById('memberProduct').value = member ? (member.product_id || '') : '';
         document.getElementById('memberName').value = member ? member.name : '';
         document.getElementById('memberEmail').value = member ? (member.email || '') : '';
         document.getElementById('memberPhone').value = member ? (member.phone || '') : '';
@@ -688,6 +709,12 @@ const UI = {
     editMember(id) {
         const member = MemberService.getById(id);
         if (member) this.openMemberModal(member);
+    },
+
+    openImportModal() {
+        this.updateImportHouseSelect();
+        document.getElementById('importCsvData').value = '';
+        this.openModal('importModal');
     },
 
     openPaymentModal(memberId) {
@@ -802,6 +829,7 @@ const UI = {
             const id = document.getElementById('houseId').value;
             const data = {
                 name: document.getElementById('houseName').value,
+                productId: document.getElementById('houseProduct').value || null,
                 description: document.getElementById('houseDescription').value
             };
 
@@ -854,7 +882,6 @@ const UI = {
             const id = document.getElementById('memberId').value;
             const data = {
                 houseId: document.getElementById('memberHouse').value,
-                productId: document.getElementById('memberProduct').value || null,
                 name: document.getElementById('memberName').value,
                 email: document.getElementById('memberEmail').value,
                 phone: document.getElementById('memberPhone').value,
@@ -878,6 +905,23 @@ const UI = {
                 this.renderDashboard();
             } catch (err) {
                 this.showToast('เกิดข้อผิดพลาด', 'error');
+            }
+        });
+
+        document.getElementById('importForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const houseId = document.getElementById('importHouse').value;
+            const csvData = document.getElementById('importCsvData').value;
+
+            try {
+                const result = await MemberService.importCSV(houseId, csvData);
+                this.showToast(`Import สำเร็จ ${result.imported} คน`, 'success');
+                this.closeModal('importModal');
+                await Store.loadAll();
+                this.renderMembers();
+                this.renderDashboard();
+            } catch (err) {
+                this.showToast('เกิดข้อผิดพลาดในการ Import', 'error');
             }
         });
 
@@ -934,8 +978,15 @@ const UI = {
             houses.map(h => `<option value="${h.id}">${h.name}</option>`).join('');
     },
 
+    updateImportHouseSelect() {
+        const select = document.getElementById('importHouse');
+        const houses = HouseService.getAll();
+        select.innerHTML = '<option value="">เลือกบ้าน</option>' +
+            houses.map(h => `<option value="${h.id}">${h.name}</option>`).join('');
+    },
+
     updateProductSelect() {
-        const select = document.getElementById('memberProduct');
+        const select = document.getElementById('houseProduct');
         if (!select) return;
         const products = ProductService.getAll();
         select.innerHTML = '<option value="">เลือก Product</option>' +
