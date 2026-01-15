@@ -43,19 +43,49 @@ const Api = {
 const Store = {
     houses: [],
     members: [],
+    products: [],
     stats: null,
 
     async loadAll() {
         try {
-            [this.houses, this.members, this.stats] = await Promise.all([
+            [this.houses, this.members, this.products, this.stats] = await Promise.all([
                 Api.get('/houses'),
                 Api.get('/members'),
+                Api.get('/products'),
                 Api.get('/stats')
             ]);
         } catch (err) {
             console.error('Failed to load data:', err);
             UI.showToast('ไม่สามารถเชื่อมต่อ Server ได้', 'error');
         }
+    }
+};
+
+// Product Service
+const ProductService = {
+    getAll() { return Store.products; },
+    getById(id) { return Store.products.find(p => p.id === id); },
+
+    async create(data) {
+        const product = await Api.post('/products', data);
+        Store.products.push(product);
+        return product;
+    },
+
+    async update(id, data) {
+        const product = await Api.put(`/products/${id}`, data);
+        const index = Store.products.findIndex(p => p.id === id);
+        if (index !== -1) Store.products[index] = product;
+        return product;
+    },
+
+    async delete(id) {
+        await Api.delete(`/products/${id}`);
+        Store.products = Store.products.filter(p => p.id !== id);
+    },
+
+    getMemberCount(productId) {
+        return Store.members.filter(m => m.product_id === productId).length;
     }
 };
 
@@ -162,6 +192,11 @@ const MemberService = {
                 return diff >= 0 && diff <= days;
             })
             .sort((a, b) => new Date(a.payment_date) - new Date(b.payment_date));
+    },
+
+    getBillingCycleLabel(cycle) {
+        const labels = { 'monthly': 'รายเดือน', '6months': 'ราย 6 เดือน', 'yearly': 'รายปี' };
+        return labels[cycle] || cycle;
     }
 };
 
@@ -210,6 +245,7 @@ const UI = {
             case 'dashboard': this.renderDashboard(); break;
             case 'houses': this.renderHouses(); break;
             case 'members': this.renderMembers(); break;
+            case 'products': this.renderProducts(); break;
             case 'payments': this.renderPayments(); break;
         }
     },
@@ -217,6 +253,7 @@ const UI = {
     renderAll() {
         this.renderDashboard();
         this.updateHouseFilter();
+        this.updateProductSelect();
     },
 
     // Dashboard
@@ -240,7 +277,9 @@ const UI = {
         Store.members.forEach(m => {
             const status = MemberService.getStatus(m);
             const house = HouseService.getById(m.house_id);
+            const product = ProductService.getById(m.product_id);
             const houseName = house ? house.name : 'ไม่ระบุบ้าน';
+            const productName = product ? product.name : '';
 
             if (status === 'expiring') {
                 const days = Math.ceil((new Date(m.expiration_date) - new Date()) / (1000 * 60 * 60 * 24));
@@ -248,7 +287,7 @@ const UI = {
                     type: 'warning',
                     icon: '⚠️',
                     title: m.name,
-                    subtitle: `${houseName} • หมดอายุใน ${days} วัน • ฿${(m.monthly_fee || 0).toLocaleString()}`,
+                    subtitle: `${houseName}${productName ? ' • ' + productName : ''} • หมดอายุใน ${days} วัน • ฿${(m.monthly_fee || 0).toLocaleString()}`,
                     badge: 'ใกล้หมดอายุ'
                 });
             } else if (status === 'expired') {
@@ -256,7 +295,7 @@ const UI = {
                     type: 'danger',
                     icon: '🚫',
                     title: m.name,
-                    subtitle: `${houseName} • หมดอายุแล้ว • ฿${(m.monthly_fee || 0).toLocaleString()}`,
+                    subtitle: `${houseName}${productName ? ' • ' + productName : ''} • หมดอายุแล้ว • ฿${(m.monthly_fee || 0).toLocaleString()}`,
                     badge: 'หมดอายุ'
                 });
             }
@@ -292,6 +331,7 @@ const UI = {
 
         container.innerHTML = upcoming.slice(0, 10).map(m => {
             const house = HouseService.getById(m.house_id);
+            const product = ProductService.getById(m.product_id);
             const date = new Date(m.payment_date);
             return `
                 <div class="upcoming-item">
@@ -301,7 +341,7 @@ const UI = {
                     </div>
                     <div class="upcoming-info">
                         <div class="upcoming-name">${m.name}</div>
-                        <div class="upcoming-house">${house ? house.name : 'ไม่ระบุ'} • ฿${(m.monthly_fee || 0).toLocaleString()}</div>
+                        <div class="upcoming-house">${house ? house.name : 'ไม่ระบุ'}${product ? ' • ' + product.name : ''} • ฿${(m.monthly_fee || 0).toLocaleString()}</div>
                     </div>
                 </div>
             `;
@@ -367,6 +407,40 @@ const UI = {
         }).join('');
     },
 
+    // Products
+    renderProducts() {
+        const container = document.getElementById('productsGrid');
+        const products = ProductService.getAll();
+
+        if (products.length === 0) {
+            container.innerHTML = `
+                <div class="empty-state" style="grid-column: 1/-1;">
+                    <div class="empty-state-icon">📦</div>
+                    <div class="empty-state-title">ยังไม่มี Product</div>
+                    <div class="empty-state-text">คลิก "เพิ่ม Product ใหม่" เพื่อเริ่มต้น</div>
+                </div>
+            `;
+            return;
+        }
+
+        container.innerHTML = products.map(p => {
+            const memberCount = ProductService.getMemberCount(p.id);
+            return `
+                <div class="product-card" style="--product-color: ${p.color}">
+                    <div class="product-header">
+                        <span class="product-icon">${p.icon || '📦'}</span>
+                        <div class="product-actions">
+                            <button class="btn-icon btn-edit" onclick="UI.editProduct('${p.id}')" title="แก้ไข">✏️</button>
+                            <button class="btn-icon btn-delete" onclick="UI.confirmDelete('product', '${p.id}')" title="ลบ">🗑️</button>
+                        </div>
+                    </div>
+                    <div class="product-name">${p.name}</div>
+                    <div class="product-count">👥 ${memberCount} สมาชิก</div>
+                </div>
+            `;
+        }).join('');
+    },
+
     // Members
     renderMembers(filters = {}) {
         const tbody = document.getElementById('membersTableBody');
@@ -389,7 +463,7 @@ const UI = {
         if (members.length === 0) {
             tbody.innerHTML = `
                 <tr>
-                    <td colspan="7">
+                    <td colspan="8">
                         <div class="empty-state">
                             <div class="empty-state-icon">👥</div>
                             <div class="empty-state-title">ไม่มีสมาชิก</div>
@@ -403,9 +477,11 @@ const UI = {
 
         tbody.innerHTML = members.map(m => {
             const house = HouseService.getById(m.house_id);
+            const product = ProductService.getById(m.product_id);
             const status = MemberService.getStatus(m);
             const statusText = status === 'active' ? '✓ Active' : status === 'expiring' ? '⚠ ใกล้หมดอายุ' : '✗ หมดอายุ';
             const initials = m.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase();
+            const billingClass = m.billing_cycle === '6months' ? 'sixmonths' : m.billing_cycle;
 
             return `
                 <tr>
@@ -418,9 +494,12 @@ const UI = {
                             </div>
                         </div>
                     </td>
+                    <td>
+                        ${product ? `<span class="product-badge" style="--product-color: ${product.color}; --product-bg: ${product.color}22"><span class="product-badge-icon">${product.icon || '📦'}</span> ${product.name}</span>` : '-'}
+                    </td>
                     <td>${house ? house.name : '-'}</td>
                     <td><strong>฿${(m.monthly_fee || 0).toLocaleString()}</strong></td>
-                    <td>${this.formatDate(m.payment_date)}</td>
+                    <td><span class="billing-badge ${billingClass}">${MemberService.getBillingCycleLabel(m.billing_cycle)}</span></td>
                     <td>${this.formatDate(m.expiration_date)}</td>
                     <td><span class="status-badge status-${status}">${statusText}</span></td>
                     <td>
@@ -455,6 +534,7 @@ const UI = {
 
         container.innerHTML = members.map(m => {
             const house = HouseService.getById(m.house_id);
+            const product = ProductService.getById(m.product_id);
             const status = MemberService.getStatus(m);
             return `
                 <div class="payment-item">
@@ -462,6 +542,7 @@ const UI = {
                         <span class="payment-member">${m.name}</span>
                         <div class="payment-details">
                             <span>${house ? house.name : '-'}</span>
+                            ${product ? `<span>${product.name}</span>` : ''}
                             <span>หมดอายุ: ${this.formatDate(m.expiration_date)}</span>
                         </div>
                     </div>
@@ -490,6 +571,7 @@ const UI = {
                         <span class="payment-member">${p.member_name}</span>
                         <div class="payment-details">
                             <span>${p.house_name || '-'}</span>
+                            ${p.product_name ? `<span>${p.product_name}</span>` : ''}
                             <span>วันที่: ${this.formatDate(p.paid_at)}</span>
                         </div>
                     </div>
@@ -515,6 +597,12 @@ const UI = {
         document.getElementById('cancelMemberBtn').addEventListener('click', () => this.closeModal('memberModal'));
         document.querySelector('#memberModal .modal-backdrop').addEventListener('click', () => this.closeModal('memberModal'));
 
+        // Product modal
+        document.getElementById('addProductBtn').addEventListener('click', () => this.openProductModal());
+        document.getElementById('closeProductModal').addEventListener('click', () => this.closeModal('productModal'));
+        document.getElementById('cancelProductBtn').addEventListener('click', () => this.closeModal('productModal'));
+        document.querySelector('#productModal .modal-backdrop').addEventListener('click', () => this.closeModal('productModal'));
+
         // Confirm modal
         document.getElementById('closeConfirmModal').addEventListener('click', () => this.closeModal('confirmModal'));
         document.getElementById('cancelConfirmBtn').addEventListener('click', () => this.closeModal('confirmModal'));
@@ -525,6 +613,11 @@ const UI = {
         document.getElementById('closePaymentModal').addEventListener('click', () => this.closeModal('paymentModal'));
         document.getElementById('cancelPaymentBtn').addEventListener('click', () => this.closeModal('paymentModal'));
         document.querySelector('#paymentModal .modal-backdrop').addEventListener('click', () => this.closeModal('paymentModal'));
+
+        // Member details modal
+        document.getElementById('closeMemberDetailsModal').addEventListener('click', () => this.closeModal('memberDetailsModal'));
+        document.getElementById('closeMemberDetailsBtn').addEventListener('click', () => this.closeModal('memberDetailsModal'));
+        document.querySelector('#memberDetailsModal .modal-backdrop').addEventListener('click', () => this.closeModal('memberDetailsModal'));
 
         // Sample data
         document.getElementById('addSampleData').addEventListener('click', () => this.addSampleData());
@@ -538,11 +631,6 @@ const UI = {
                 document.getElementById(`tab-${btn.dataset.tab}`).classList.add('active');
             });
         });
-
-        // Member details modal
-        document.getElementById('closeMemberDetailsModal').addEventListener('click', () => this.closeModal('memberDetailsModal'));
-        document.getElementById('closeMemberDetailsBtn').addEventListener('click', () => this.closeModal('memberDetailsModal'));
-        document.querySelector('#memberDetailsModal .modal-backdrop').addEventListener('click', () => this.closeModal('memberDetailsModal'));
     },
 
     openModal(modalId) {
@@ -566,15 +654,32 @@ const UI = {
         if (house) this.openHouseModal(house);
     },
 
+    openProductModal(product = null) {
+        document.getElementById('productModalTitle').textContent = product ? 'แก้ไข Product' : 'เพิ่ม Product ใหม่';
+        document.getElementById('productId').value = product ? product.id : '';
+        document.getElementById('productName').value = product ? product.name : '';
+        document.getElementById('productIcon').value = product ? (product.icon || '') : '';
+        document.getElementById('productColor').value = product ? (product.color || '#6366f1') : '#6366f1';
+        this.openModal('productModal');
+    },
+
+    editProduct(id) {
+        const product = ProductService.getById(id);
+        if (product) this.openProductModal(product);
+    },
+
     openMemberModal(member = null) {
         this.updateHouseSelect();
+        this.updateProductSelect();
         document.getElementById('memberModalTitle').textContent = member ? 'แก้ไขสมาชิก' : 'เพิ่มสมาชิกใหม่';
         document.getElementById('memberId').value = member ? member.id : '';
         document.getElementById('memberHouse').value = member ? member.house_id : '';
+        document.getElementById('memberProduct').value = member ? (member.product_id || '') : '';
         document.getElementById('memberName').value = member ? member.name : '';
         document.getElementById('memberEmail').value = member ? (member.email || '') : '';
         document.getElementById('memberPhone').value = member ? (member.phone || '') : '';
         document.getElementById('monthlyFee').value = member ? (member.monthly_fee || '') : '';
+        document.getElementById('billingCycle').value = member ? (member.billing_cycle || 'monthly') : 'monthly';
         document.getElementById('paymentDate').value = member ? member.payment_date : '';
         document.getElementById('expirationDate').value = member ? member.expiration_date : '';
         this.openModal('memberModal');
@@ -592,26 +697,28 @@ const UI = {
         document.getElementById('paymentMemberId').value = memberId;
         document.getElementById('paymentAmount').value = member.monthly_fee || '';
 
+        // Calculate new expiration based on billing cycle
         const newExp = new Date();
-        newExp.setDate(newExp.getDate() + 30);
+        const cycle = member.billing_cycle || 'monthly';
+        if (cycle === 'yearly') newExp.setFullYear(newExp.getFullYear() + 1);
+        else if (cycle === '6months') newExp.setMonth(newExp.getMonth() + 6);
+        else newExp.setMonth(newExp.getMonth() + 1);
+
         document.getElementById('newExpirationDate').value = newExp.toISOString().split('T')[0];
 
         this.openModal('paymentModal');
     },
 
-    // Show members by status (for house card clicks)
     showMembersByStatus(houseId, status) {
         const house = HouseService.getById(houseId);
         if (!house) return;
 
         let members = Store.members.filter(m => m.house_id === houseId);
 
-        // Filter by status if not 'all'
         if (status !== 'all') {
             members = members.filter(m => MemberService.getStatus(m) === status);
         }
 
-        // Set title based on status
         const statusTitles = {
             'all': 'สมาชิกทั้งหมด',
             'active': 'สมาชิก Active',
@@ -620,7 +727,6 @@ const UI = {
         };
         document.getElementById('memberDetailsTitle').textContent = `${house.name} - ${statusTitles[status]} (${members.length} คน)`;
 
-        // Render member list
         const container = document.getElementById('memberDetailsList');
 
         if (members.length === 0) {
@@ -628,6 +734,7 @@ const UI = {
         } else {
             container.innerHTML = members.map(m => {
                 const memberStatus = MemberService.getStatus(m);
+                const product = ProductService.getById(m.product_id);
                 const statusText = memberStatus === 'active' ? '✓ Active' : memberStatus === 'expiring' ? '⚠ ใกล้หมด' : '✗ หมดอายุ';
                 const initials = m.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase();
 
@@ -637,8 +744,7 @@ const UI = {
                         <div class="member-detail-info">
                             <div class="member-detail-name">${m.name}</div>
                             <div class="member-detail-meta">
-                                <span>📧 ${m.email || '-'}</span>
-                                <span>📱 ${m.phone || '-'}</span>
+                                ${product ? `<span>${product.icon || '📦'} ${product.name}</span>` : ''}
                                 <span>📅 หมดอายุ: ${this.formatDate(m.expiration_date)}</span>
                             </div>
                         </div>
@@ -657,7 +763,7 @@ const UI = {
     },
 
     confirmDelete(type, id) {
-        const item = type === 'house' ? HouseService.getById(id) : MemberService.getById(id);
+        const item = type === 'house' ? HouseService.getById(id) : type === 'product' ? ProductService.getById(id) : MemberService.getById(id);
         const name = item ? item.name : '';
         document.getElementById('confirmMessage').textContent = `คุณแน่ใจหรือไม่ที่จะลบ "${name}"?`;
         this.deleteCallback = async () => {
@@ -665,6 +771,9 @@ const UI = {
                 if (type === 'house') {
                     await HouseService.delete(id);
                     this.renderHouses();
+                } else if (type === 'product') {
+                    await ProductService.delete(id);
+                    this.renderProducts();
                 } else {
                     await MemberService.delete(id);
                     this.renderMembers();
@@ -714,15 +823,43 @@ const UI = {
             }
         });
 
+        document.getElementById('productForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const id = document.getElementById('productId').value;
+            const data = {
+                name: document.getElementById('productName').value,
+                icon: document.getElementById('productIcon').value || '📦',
+                color: document.getElementById('productColor').value || '#6366f1'
+            };
+
+            try {
+                if (id) {
+                    await ProductService.update(id, data);
+                    this.showToast('อัปเดต Product เรียบร้อยแล้ว', 'success');
+                } else {
+                    await ProductService.create(data);
+                    this.showToast('เพิ่ม Product เรียบร้อยแล้ว', 'success');
+                }
+
+                this.closeModal('productModal');
+                this.renderProducts();
+                this.updateProductSelect();
+            } catch (err) {
+                this.showToast('เกิดข้อผิดพลาด', 'error');
+            }
+        });
+
         document.getElementById('memberForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             const id = document.getElementById('memberId').value;
             const data = {
                 houseId: document.getElementById('memberHouse').value,
+                productId: document.getElementById('memberProduct').value || null,
                 name: document.getElementById('memberName').value,
                 email: document.getElementById('memberEmail').value,
                 phone: document.getElementById('memberPhone').value,
                 monthlyFee: parseFloat(document.getElementById('monthlyFee').value) || 0,
+                billingCycle: document.getElementById('billingCycle').value || 'monthly',
                 paymentDate: document.getElementById('paymentDate').value,
                 expirationDate: document.getElementById('expirationDate').value
             };
@@ -797,10 +934,21 @@ const UI = {
             houses.map(h => `<option value="${h.id}">${h.name}</option>`).join('');
     },
 
+    updateProductSelect() {
+        const select = document.getElementById('memberProduct');
+        if (!select) return;
+        const products = ProductService.getAll();
+        select.innerHTML = '<option value="">เลือก Product</option>' +
+            products.map(p => `<option value="${p.id}">${p.icon || '📦'} ${p.name}</option>`).join('');
+    },
+
     // Mobile menu
     bindMobileMenu() {
-        document.getElementById('mobileMenuToggle').addEventListener('click', () => {
-            document.getElementById('sidebar').classList.toggle('open');
+        const toggle = document.getElementById('mobileMenuToggle');
+        const sidebar = document.getElementById('sidebar');
+
+        toggle.addEventListener('click', () => {
+            sidebar.classList.toggle('open');
         });
     },
 
@@ -823,8 +971,7 @@ const UI = {
         container.appendChild(toast);
 
         setTimeout(() => {
-            toast.style.animation = 'toastSlideIn 0.25s ease reverse';
-            setTimeout(() => toast.remove(), 250);
+            toast.remove();
         }, 3000);
     },
 
@@ -832,18 +979,13 @@ const UI = {
         try {
             await Api.post('/sample-data', {});
             await Store.loadAll();
-            this.showToast('เพิ่มข้อมูลตัวอย่างเรียบร้อยแล้ว', 'success');
             this.renderAll();
-            this.updateHouseFilter();
-            if (this.currentPage === 'houses') this.renderHouses();
-            if (this.currentPage === 'members') this.renderMembers();
+            this.showToast('เพิ่มข้อมูลตัวอย่างเรียบร้อย', 'success');
         } catch (err) {
-            this.showToast('เกิดข้อผิดพลาด - ตรวจสอบว่า server ทำงานอยู่', 'error');
+            this.showToast('เกิดข้อผิดพลาด', 'error');
         }
     }
 };
 
 // Initialize
-document.addEventListener('DOMContentLoaded', () => {
-    UI.init();
-});
+document.addEventListener('DOMContentLoaded', () => UI.init());

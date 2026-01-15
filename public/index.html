@@ -37,6 +37,10 @@
                     <span class="nav-icon">👥</span>
                     <span class="nav-text">สมาชิก</span>
                 </a>
+                <a href="#" class="nav-item" data-page="products">
+                    <span class="nav-icon">📦</span>
+                    <span class="nav-text">Products</span>
+                </a>
                 <a href="#" class="nav-item" data-page="payments">
                     <span class="nav-icon">💳</span>
                     <span class="nav-text">การชำระเงิน</span>
@@ -172,9 +176,10 @@
                         <thead>
                             <tr>
                                 <th>สมาชิก</th>
+                                <th>Product</th>
                                 <th>บ้าน</th>
                                 <th>ยอดชำระ</th>
-                                <th>วันชำระเงิน</th>
+                                <th>รอบบิล</th>
                                 <th>วันหมดอายุ</th>
                                 <th>สถานะ</th>
                                 <th>จัดการ</th>
@@ -211,6 +216,23 @@
                     <div class="payment-history" id="paymentHistory">
                         <!-- Payment history will be rendered here -->
                     </div>
+                </div>
+            </section>
+
+            <!-- Products Page -->
+            <section class="page" id="page-products">
+                <header class="page-header">
+                    <div class="header-left">
+                        <h1>📦 จัดการ Products</h1>
+                        <p class="page-subtitle">เพิ่ม แก้ไข และจัดการ Subscription Products</p>
+                    </div>
+                    <button class="btn btn-primary" id="addProductBtn">
+                        <span>➕</span> เพิ่ม Product ใหม่
+                    </button>
+                </header>
+
+                <div class="products-grid" id="productsGrid">
+                    <!-- Products will be rendered here -->
                 </div>
             </section>
         </main>
@@ -259,20 +281,38 @@
                     </select>
                 </div>
                 <div class="form-group">
+                    <label for="memberProduct">Product *</label>
+                    <select id="memberProduct" required>
+                        <option value="">เลือก Product</option>
+                    </select>
+                </div>
+                <div class="form-group">
                     <label for="memberName">ชื่อสมาชิก *</label>
                     <input type="text" id="memberName" required placeholder="ชื่อ-นามสกุล">
                 </div>
-                <div class="form-group">
-                    <label for="memberEmail">อีเมล</label>
-                    <input type="email" id="memberEmail" placeholder="email@example.com">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="memberEmail">อีเมล</label>
+                        <input type="email" id="memberEmail" placeholder="email@example.com">
+                    </div>
+                    <div class="form-group">
+                        <label for="memberPhone">เบอร์โทร</label>
+                        <input type="tel" id="memberPhone" placeholder="0812345678">
+                    </div>
                 </div>
-                <div class="form-group">
-                    <label for="memberPhone">เบอร์โทร</label>
-                    <input type="tel" id="memberPhone" placeholder="0812345678">
-                </div>
-                <div class="form-group">
-                    <label for="monthlyFee">ยอดชำระ/เดือน (บาท) *</label>
-                    <input type="number" id="monthlyFee" required placeholder="299" min="0" step="0.01">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="monthlyFee">ยอดชำระ (บาท) *</label>
+                        <input type="number" id="monthlyFee" required placeholder="299" min="0" step="0.01">
+                    </div>
+                    <div class="form-group">
+                        <label for="billingCycle">รอบบิล *</label>
+                        <select id="billingCycle" required>
+                            <option value="monthly">รายเดือน</option>
+                            <option value="6months">ราย 6 เดือน</option>
+                            <option value="yearly">รายปี</option>
+                        </select>
+                    </div>
                 </div>
                 <div class="form-row">
                     <div class="form-group">
@@ -352,6 +392,38 @@
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" id="closeMemberDetailsBtn">ปิด</button>
             </div>
+        </div>
+    </div>
+
+    <!-- Modal: Add/Edit Product -->
+    <div class="modal" id="productModal">
+        <div class="modal-backdrop"></div>
+        <div class="modal-content modal-small">
+            <div class="modal-header">
+                <h2 id="productModalTitle">เพิ่ม Product ใหม่</h2>
+                <button class="modal-close" id="closeProductModal">&times;</button>
+            </div>
+            <form id="productForm">
+                <input type="hidden" id="productId">
+                <div class="form-group">
+                    <label for="productName">ชื่อ Product *</label>
+                    <input type="text" id="productName" required placeholder="เช่น Netflix, Apple One">
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="productIcon">Icon (Emoji)</label>
+                        <input type="text" id="productIcon" placeholder="🎬" maxlength="4">
+                    </div>
+                    <div class="form-group">
+                        <label for="productColor">สี</label>
+                        <input type="color" id="productColor" value="#6366f1">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" id="cancelProductBtn">ยกเลิก</button>
+                    <button type="submit" class="btn btn-primary">บันทึก</button>
+                </div>
+            </form>
         </div>
     </div>
 

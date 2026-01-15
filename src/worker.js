@@ -34,6 +34,35 @@ async function handleRequest(request, env) {
     // API Routes
     if (path.startsWith('/api/')) {
         try {
+            // Products
+            if (path === '/api/products' && method === 'GET') {
+                const { results } = await env.DB.prepare('SELECT * FROM products ORDER BY name').all();
+                return jsonResponse(results);
+            }
+
+            if (path === '/api/products' && method === 'POST') {
+                const { name, icon, color } = await request.json();
+                const id = 'prod_' + Date.now();
+                await env.DB.prepare('INSERT INTO products (id, name, icon, color) VALUES (?, ?, ?, ?)').bind(id, name, icon || '📦', color || '#6366f1').run();
+                const product = await env.DB.prepare('SELECT * FROM products WHERE id = ?').bind(id).first();
+                return jsonResponse(product, 201);
+            }
+
+            if (path.match(/^\/api\/products\/[^/]+$/) && method === 'PUT') {
+                const id = path.split('/')[3];
+                const { name, icon, color } = await request.json();
+                await env.DB.prepare('UPDATE products SET name = ?, icon = ?, color = ? WHERE id = ?').bind(name, icon || '📦', color || '#6366f1', id).run();
+                const product = await env.DB.prepare('SELECT * FROM products WHERE id = ?').bind(id).first();
+                return jsonResponse(product);
+            }
+
+            if (path.match(/^\/api\/products\/[^/]+$/) && method === 'DELETE') {
+                const id = path.split('/')[3];
+                await env.DB.prepare('UPDATE members SET product_id = NULL WHERE product_id = ?').bind(id).run();
+                await env.DB.prepare('DELETE FROM products WHERE id = ?').bind(id).run();
+                return jsonResponse({ success: true });
+            }
+
             // Houses
             if (path === '/api/houses' && method === 'GET') {
                 const { results } = await env.DB.prepare('SELECT * FROM houses ORDER BY created_at DESC').all();
@@ -66,13 +95,13 @@ async function handleRequest(request, env) {
             // Members
             if (path === '/api/members' && method === 'GET') {
                 const { results } = await env.DB.prepare(`
-                    SELECT m.*, h.name as house_name 
+                    SELECT m.*, h.name as house_name, p.name as product_name, p.icon as product_icon, p.color as product_color
                     FROM members m 
                     LEFT JOIN houses h ON m.house_id = h.id 
+                    LEFT JOIN products p ON m.product_id = p.id
                     ORDER BY m.created_at DESC
                 `).all();
 
-                // Get payment history for each member
                 for (const m of results) {
                     const { results: history } = await env.DB.prepare('SELECT * FROM payment_history WHERE member_id = ? ORDER BY paid_at DESC').bind(m.id).all();
                     m.paymentHistory = history;
@@ -81,12 +110,12 @@ async function handleRequest(request, env) {
             }
 
             if (path === '/api/members' && method === 'POST') {
-                const { houseId, name, email, phone, monthlyFee, paymentDate, expirationDate } = await request.json();
+                const { houseId, productId, name, email, phone, monthlyFee, billingCycle, paymentDate, expirationDate } = await request.json();
                 const id = generateId();
                 await env.DB.prepare(`
-                    INSERT INTO members (id, house_id, name, email, phone, monthly_fee, payment_date, expiration_date) 
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                `).bind(id, houseId, name, email || '', phone || '', monthlyFee || 0, paymentDate, expirationDate).run();
+                    INSERT INTO members (id, house_id, product_id, name, email, phone, monthly_fee, billing_cycle, payment_date, expiration_date) 
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                `).bind(id, houseId, productId || null, name, email || '', phone || '', monthlyFee || 0, billingCycle || 'monthly', paymentDate, expirationDate).run();
                 const member = await env.DB.prepare('SELECT * FROM members WHERE id = ?').bind(id).first();
                 member.paymentHistory = [];
                 return jsonResponse(member, 201);
@@ -94,11 +123,11 @@ async function handleRequest(request, env) {
 
             if (path.match(/^\/api\/members\/[^/]+$/) && method === 'PUT') {
                 const id = path.split('/')[3];
-                const { houseId, name, email, phone, monthlyFee, paymentDate, expirationDate } = await request.json();
+                const { houseId, productId, name, email, phone, monthlyFee, billingCycle, paymentDate, expirationDate } = await request.json();
                 await env.DB.prepare(`
-                    UPDATE members SET house_id = ?, name = ?, email = ?, phone = ?, monthly_fee = ?, payment_date = ?, expiration_date = ? 
+                    UPDATE members SET house_id = ?, product_id = ?, name = ?, email = ?, phone = ?, monthly_fee = ?, billing_cycle = ?, payment_date = ?, expiration_date = ? 
                     WHERE id = ?
-                `).bind(houseId, name, email || '', phone || '', monthlyFee || 0, paymentDate, expirationDate, id).run();
+                `).bind(houseId, productId || null, name, email || '', phone || '', monthlyFee || 0, billingCycle || 'monthly', paymentDate, expirationDate, id).run();
                 const member = await env.DB.prepare('SELECT * FROM members WHERE id = ?').bind(id).first();
                 const { results: history } = await env.DB.prepare('SELECT * FROM payment_history WHERE member_id = ? ORDER BY paid_at DESC').bind(id).all();
                 member.paymentHistory = history;
@@ -128,10 +157,11 @@ async function handleRequest(request, env) {
             // Payments
             if (path === '/api/payments' && method === 'GET') {
                 const { results } = await env.DB.prepare(`
-                    SELECT ph.*, m.name as member_name, h.name as house_name
+                    SELECT ph.*, m.name as member_name, h.name as house_name, p.name as product_name
                     FROM payment_history ph
                     JOIN members m ON ph.member_id = m.id
                     LEFT JOIN houses h ON m.house_id = h.id
+                    LEFT JOIN products p ON m.product_id = p.id
                     ORDER BY ph.paid_at DESC
                 `).all();
                 return jsonResponse(results);
@@ -141,6 +171,7 @@ async function handleRequest(request, env) {
             if (path === '/api/stats' && method === 'GET') {
                 const totalHouses = (await env.DB.prepare('SELECT COUNT(*) as count FROM houses').first()).count;
                 const totalMembers = (await env.DB.prepare('SELECT COUNT(*) as count FROM members').first()).count;
+                const totalProducts = (await env.DB.prepare('SELECT COUNT(*) as count FROM products').first()).count;
                 const totalMonthlyFee = (await env.DB.prepare('SELECT COALESCE(SUM(monthly_fee), 0) as total FROM members').first()).total;
 
                 const today = new Date().toISOString().split('T')[0];
@@ -152,6 +183,7 @@ async function handleRequest(request, env) {
                 return jsonResponse({
                     totalHouses,
                     totalMembers,
+                    totalProducts,
                     totalMonthlyFee,
                     activeMembers: totalMembers - expiredMembers - expiringMembers,
                     expiringMembers,
@@ -161,22 +193,23 @@ async function handleRequest(request, env) {
 
             // Sample data
             if (path === '/api/sample-data' && method === 'POST') {
-                // Clear existing data
                 await env.DB.prepare('DELETE FROM payment_history').run();
                 await env.DB.prepare('DELETE FROM members').run();
                 await env.DB.prepare('DELETE FROM houses').run();
 
-                // Sample houses
                 const houseNames = ['บ้านที่ 1', 'บ้านที่ 2', 'บ้านที่ 3', 'บ้านที่ 4', 'บ้านที่ 5'];
                 const houseIds = [];
-
                 for (const name of houseNames) {
                     const id = generateId();
                     houseIds.push(id);
                     await env.DB.prepare('INSERT INTO houses (id, name, description) VALUES (?, ?, ?)').bind(id, name, `รายละเอียดของ${name}`).run();
                 }
 
-                // Sample members
+                // Get products
+                const { results: products } = await env.DB.prepare('SELECT id FROM products').all();
+                const productIds = products.map(p => p.id);
+
+                const billingCycles = ['monthly', '6months', 'yearly'];
                 const memberData = [
                     { name: 'สมชาย ใจดี', fee: 299 },
                     { name: 'สมหญิง รักเรียน', fee: 199 },
@@ -191,31 +224,22 @@ async function handleRequest(request, env) {
                 ];
 
                 const today = new Date();
-
                 for (let i = 0; i < memberData.length; i++) {
                     const m = memberData[i];
                     const id = generateId();
                     const houseId = houseIds[i % houseIds.length];
+                    const productId = productIds.length > 0 ? productIds[i % productIds.length] : null;
+                    const billingCycle = billingCycles[i % billingCycles.length];
 
                     const payDate = new Date(today);
                     payDate.setDate(payDate.getDate() + (i * 3) - 10);
-
                     const expDate = new Date(today);
                     expDate.setDate(expDate.getDate() + (i * 5) - 15);
 
                     await env.DB.prepare(`
-                        INSERT INTO members (id, house_id, name, email, phone, monthly_fee, payment_date, expiration_date) 
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                    `).bind(
-                        id,
-                        houseId,
-                        m.name,
-                        `member${i + 1}@example.com`,
-                        `08${Math.floor(10000000 + Math.random() * 90000000)}`,
-                        m.fee,
-                        payDate.toISOString().split('T')[0],
-                        expDate.toISOString().split('T')[0]
-                    ).run();
+                        INSERT INTO members (id, house_id, product_id, name, email, phone, monthly_fee, billing_cycle, payment_date, expiration_date) 
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    `).bind(id, houseId, productId, m.name, `member${i + 1}@example.com`, `08${Math.floor(10000000 + Math.random() * 90000000)}`, m.fee, billingCycle, payDate.toISOString().split('T')[0], expDate.toISOString().split('T')[0]).run();
                 }
 
                 return jsonResponse({ success: true, message: 'Sample data created' });
@@ -227,19 +251,13 @@ async function handleRequest(request, env) {
         }
     }
 
-    // For non-API routes, return null to let the asset handler take over
     return null;
 }
 
 export default {
     async fetch(request, env, ctx) {
         const response = await handleRequest(request, env);
-        // If we got a response from the API handler, return it
-        if (response) {
-            return response;
-        }
-        // Otherwise, this request should be handled by Cloudflare's asset serving
-        // Since we're using `assets` in wrangler.toml, Cloudflare handles this automatically
+        if (response) return response;
         return new Response('Not Found', { status: 404 });
     }
 };
